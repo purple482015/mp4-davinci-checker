@@ -13,6 +13,8 @@ const resolutionEl = document.getElementById('resolution');
 const videoCodecEl = document.getElementById('videoCodec');
 const audioCodecEl = document.getElementById('audioCodec');
 
+let selectedFile = null;
+
 const goodVideoPatterns = [/avc1/i, /h264/i, /hvc1/i, /hev1/i, /prores/i, /apch|apcn|apco|apcs/i, /dnxhd|dnxhr/i];
 const badVideoPatterns = [/divx/i, /flv1/i, /mjp/i, /mjpg/i, /theora/i, /vp8/i, /vp9/i, /rv20|rv30|rv40/i];
 
@@ -175,11 +177,13 @@ function readVideoMetadata(file) {
 }
 
 function showExportPreset() {
-  const ffmpegCommand = 'ffmpeg -i input.mp4 -c:v libx264 -preset medium -crf 20 -c:a aac -movflags +faststart output.mp4';
+  const sourceName = selectedFile ? selectedFile.name : 'input.mp4';
+  const outputName = sourceName.replace(/\.mp4$/i, '-h264-aac.mp4');
+  const ffmpegCommand = `ffmpeg -i "${sourceName}" -c:v libx264 -preset medium -crf 20 -c:a aac -movflags +faststart "${outputName}"`;
 
   setStatus('Recommended export profile: H.264 + AAC in MP4', 'success');
   setBadge('warning', 'Best format');
-  compatibilitySummary.textContent = 'This is the safest export profile for DaVinci Resolve Free when a file is unreadable, unusual, or needs re-encoding.';
+  compatibilitySummary.textContent = 'This is the safest export profile for DaVinci Resolve Free when a file is unreadable, unusual, or needs re-encoding. The command uses the file you selected automatically.';
   recommendations.innerHTML = `
     <li>Use H.264 video.</li>
     <li>Use AAC audio.</li>
@@ -195,6 +199,8 @@ function showExportPreset() {
 
 async function analyzeFile(file) {
   if (!file) return;
+
+  selectedFile = file;
 
   const isMp4 = file.name.toLowerCase().endsWith('.mp4') || file.type === 'video/mp4';
   if (!isMp4) {

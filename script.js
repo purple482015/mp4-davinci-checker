@@ -53,7 +53,7 @@ function evaluateCompatibility(videoCodec, audioCodec) {
   const normalizedVideo = String(videoCodec || '').toLowerCase();
   const normalizedAudio = String(audioCodec || '').toLowerCase();
 
-  if (!normalizedVideo) {
+  if (!normalizedVideo || normalizedVideo === 'unknown') {
     return {
       level: 'warning',
       title: 'Needs a manual check',
@@ -108,11 +108,19 @@ function evaluateCompatibility(videoCodec, audioCodec) {
 }
 
 function parseMp4(file) {
-  return new Promise((resolve, reject) => {
-    try {
-      const mp4box = MP4Box.createFile();
+  return new Promise((resolve) => {
+    if (!window.MP4Box) {
+      resolve({ duration: 0, width: 0, height: 0, videoCodec: 'Unknown', audioCodec: 'Unknown' });
+      return;
+    }
 
-      mp4box.onError = (error) => reject(error);
+    try {
+      const mp4box = window.MP4Box.createFile();
+
+      mp4box.onError = () => {
+        resolve({ duration: 0, width: 0, height: 0, videoCodec: 'Unknown', audioCodec: 'Unknown' });
+      };
+
       mp4box.onReady = (info) => {
         const videoTrack = info?.tracks?.find((track) => track.type === 'video');
         const audioTrack = info?.tracks?.find((track) => track.type === 'audio');
@@ -126,18 +134,22 @@ function parseMp4(file) {
         });
       };
 
-      file.arrayBuffer().then((buffer) => {
-        mp4box.appendBuffer(buffer);
-        mp4box.flush();
-      }).catch(reject);
+      file.arrayBuffer()
+        .then((buffer) => {
+          mp4box.appendBuffer(buffer);
+          mp4box.flush();
+        })
+        .catch(() => {
+          resolve({ duration: 0, width: 0, height: 0, videoCodec: 'Unknown', audioCodec: 'Unknown' });
+        });
     } catch (error) {
-      reject(error);
+      resolve({ duration: 0, width: 0, height: 0, videoCodec: 'Unknown', audioCodec: 'Unknown' });
     }
   });
 }
 
 function readVideoMetadata(file) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const video = document.createElement('video');
     const objectUrl = URL.createObjectURL(file);
 
@@ -156,7 +168,7 @@ function readVideoMetadata(file) {
 
     video.onerror = () => {
       URL.revokeObjectURL(objectUrl);
-      reject(new Error('Unable to read MP4 metadata.'));
+      resolve({ duration: 0, width: 0, height: 0 });
     };
   });
 }
@@ -176,10 +188,13 @@ async function analyzeFile(file) {
   setStatus('Analyzing MP4…', 'success');
 
   try {
-    const [nativeInfo, mp4Info] = await Promise.all([
+    const [nativeInfoResult, mp4InfoResult] = await Promise.allSettled([
       readVideoMetadata(file),
       parseMp4(file)
     ]);
+
+    const nativeInfo = nativeInfoResult.status === 'fulfilled' ? nativeInfoResult.value : { duration: 0, width: 0, height: 0 };
+    const mp4Info = mp4InfoResult.status === 'fulfilled' ? mp4InfoResult.value : { duration: 0, width: 0, height: 0, videoCodec: 'Unknown', audioCodec: 'Unknown' };
 
     const resultInfo = {
       duration: mp4Info.duration || nativeInfo.duration || 0,

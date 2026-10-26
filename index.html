@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DaVinci Resolve Free MP4 Checker</title>
+    <meta
+      name="description"
+      content="Check whether an MP4 is likely compatible with DaVinci Resolve Free using a browser-based compatibility checker."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <p class="eyebrow">GitHub Pages utility</p>
+        <h1>DaVinci Resolve Free MP4 Checker</h1>
+        <p class="subtitle">
+          Upload an MP4 to see if it is likely compatible with DaVinci Resolve Free.
+        </p>
+      </header>
+
+      <main class="app-card">
+        <label for="fileInput" class="dropzone" id="dropzone">
+          <input id="fileInput" type="file" accept=".mp4,video/mp4" />
+          <div class="dropzone-inner">
+            <div class="icon">🎬</div>
+            <h2>Select an MP4 file</h2>
+            <p>or drag and drop it here</p>
+          </div>
+        </label>
+
+        <div id="status" class="status hidden" aria-live="polite"></div>
+
+        <section class="metrics" aria-label="File metadata">
+          <div class="metric-box">
+            <span class="label">File</span>
+            <strong id="fileName">—</strong>
+          </div>
+          <div class="metric-box">
+            <span class="label">Format</span>
+            <strong id="fileFormat">—</strong>
+          </div>
+          <div class="metric-box">
+            <span class="label">Duration</span>
+            <strong id="duration">—</strong>
+          </div>
+          <div class="metric-box">
+            <span class="label">Resolution</span>
+            <strong id="resolution">—</strong>
+          </div>
+          <div class="metric-box">
+            <span class="label">Video codec</span>
+            <strong id="videoCodec">—</strong>
+          </div>
+          <div class="metric-box">
+            <span class="label">Audio codec</span>
+            <strong id="audioCodec">—</strong>
+          </div>
+        </section>
+
+        <section class="compatibility-panel" aria-live="polite">
+          <h3>Compatibility verdict</h3>
+          <div id="compatibilityBadge" class="compatibility-badge neutral">
+            Waiting for file
+          </div>
+          <p id="compatibilitySummary">
+            Upload an MP4 to determine if it is likely compatible with DaVinci Resolve Free.
+          </p>
+          <ul id="recommendations" class="recommendations">
+            <li>Use an MP4 container.</li>
+            <li>Prefer standard codecs such as H.264 or H.265.</li>
+            <li>If it fails, transcode to H.264 + AAC in MP4.</li>
+          </ul>
+        </section>
+      </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>

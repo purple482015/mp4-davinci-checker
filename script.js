@@ -15,8 +15,25 @@ const audioCodecEl = document.getElementById('audioCodec');
 
 let selectedFile = null;
 
-const goodVideoPatterns = [/avc1/i, /h264/i, /hvc1/i, /hev1/i, /prores/i, /apch|apcn|apco|apcs/i, /dnxhd|dnxhr/i];
-const badVideoPatterns = [/divx/i, /flv1/i, /mjp/i, /mjpg/i, /theora/i, /vp8/i, /vp9/i, /rv20|rv30|rv40/i];
+const goodVideoPatterns = [
+  /avc1/i, /avc3/i, /h264/i, /h\.264/i,
+  /hvc1/i, /hev1/i, /h265/i, /hevc/i, /mpeg-4/i,
+  /prores/i, /apch|apcn|apco|apcs/i, /dnxhd|dnxhr/i
+];
+
+const warningVideoPatterns = [
+  /mpeg2/i, /mpeg-2/i, /mp4v/i, /mp4v-esp/i, /av01/i,
+  /msmpeg/i, /wmv/i, /vc1/i
+];
+
+const badVideoPatterns = [
+  /divx/i, /xvid/i, /flv1/i, /mjp/i, /mjpg/i, /theora/i,
+  /vp8/i, /vp9/i, /rv20|rv30|rv40/i, /mjpeg/i,
+  /3ivx/i, /fmp4/i
+];
+
+const goodAudioPatterns = [/aac/i, /mp4a/i, /pcm/i, /lpcm/i, /opus/i, /mp3/i];
+const warningAudioPatterns = [/eac3/i, /ac3/i, /wav/i];
 
 function setStatus(message, type = '') {
   statusBox.textContent = message;
@@ -52,9 +69,27 @@ function updateMetadata(file, info) {
   audioCodecEl.textContent = info.audioCodec || 'Unknown';
 }
 
-function evaluateCompatibility(videoCodec, audioCodec) {
+function generateExportCommand(file) {
+  if (!file) {
+    return 'ffmpeg -i "input.mp4" -c:v libx264 -preset medium -crf 20 -c:a aac -movflags +faststart "output-h264-aac.mp4"';
+  }
+
+  const name = file.name || 'input.mp4';
+  const withoutExt = name.replace(/\.[^/.]+$/, '');
+  const outputName = `${withoutExt}-h264-aac.mp4`;
+  return `ffmpeg -y -i "${name}" -c:v libx264 -preset medium -crf 20 -c:a aac -movflags +faststart "${outputName}"`;
+}
+
+function evaluateCompatibility(videoCodec, audioCodec, width, height) {
   const normalizedVideo = String(videoCodec || '').toLowerCase();
   const normalizedAudio = String(audioCodec || '').toLowerCase();
+
+  const isGoodVideo = goodVideoPatterns.some((pattern) => pattern.test(normalizedVideo));
+  const isWarningVideo = warningVideoPatterns.some((pattern) => pattern.test(normalizedVideo));
+  const isBadVideo = badVideoPatterns.some((pattern) => pattern.test(normalizedVideo));
+
+  const isGoodAudio = goodAudioPatterns.some((pattern) => pattern.test(normalizedAudio));
+  const isWarningAudio = warningAudioPatterns.some((pattern) => pattern.test(normalizedAudio));
 
   if (!normalizedVideo || normalizedVideo === 'unknown') {
     return {
@@ -69,43 +104,66 @@ function evaluateCompatibility(videoCodec, audioCodec) {
     };
   }
 
-  const isKnownGood = goodVideoPatterns.some((pattern) => pattern.test(normalizedVideo));
-  const isKnownBad = badVideoPatterns.some((pattern) => pattern.test(normalizedVideo));
-
-  if (isKnownBad) {
+  if (isBadVideo) {
     return {
       level: 'bad',
       title: 'Likely incompatible',
-      summary: `The detected video codec (${videoCodec}) is often problematic with DaVinci Resolve Free, especially in MP4 files. This file may need to be re-encoded before import.`,
+      summary: `The detected video codec (${videoCodec}) is often problematic with DaVinci Resolve Free. This file should usually be re-encoded as H.264/AAC MP4 before import.`,
       recommendations: [
         'Transcode to H.264 video and AAC audio in an MP4 container.',
-        'Use a standard export preset from your editing app or converter.',
-        'Test a short clip before converting the full file.'
+        'Use a standard export preset from your editor or converter.',
+        'Test a short clip first before converting the whole file.'
       ]
     };
   }
 
-  if (isKnownGood) {
+  if (isGoodVideo && (isGoodAudio || isWarningAudio || !normalizedAudio || normalizedAudio === 'unknown')) {
     return {
       level: 'good',
       title: 'Likely compatible',
-      summary: `The detected video codec (${videoCodec}) is a common format for DaVinci Resolve Free, and the file is likely usable in Resolve. Final compatibility may still depend on the exact file profile and audio stream.`,
+      summary: `The detected codec profile (${videoCodec}) is a common Resolve-friendly option. The file is likely usable in DaVinci Resolve Free, especially when saved as H.264/AAC MP4.`,
       recommendations: [
         'Keep the MP4 container and standard codec profile.',
-        'If the audio stream causes issues, convert it to AAC or PCM.',
-        'Quick test a short clip before a full timeline import.'
+        'If audio issues appear, convert audio to AAC or PCM.',
+        'Quickly test a short clip before a full project import.'
+      ]
+    };
+  }
+
+  if (isWarningVideo || isWarningAudio) {
+    return {
+      level: 'warning',
+      title: 'Possible compatibility issue',
+      summary: `The file uses a codec profile (${videoCodec}, ${audioCodec}) that may work, but it is not the safest option for DaVinci Resolve Free. Re-exporting as H.264/AAC MP4 is recommended.`,
+      recommendations: [
+        'Re-export as H.264 video and AAC audio in MP4.',
+        'Try a short test clip in Resolve before importing a large timeline.',
+        'If it still behaves oddly, convert the file to a standard MP4 preset.'
+      ]
+    };
+  }
+
+  if (width && height && width > 0 && height > 0) {
+    return {
+      level: 'warning',
+      title: 'Possible compatibility issue',
+      summary: `The file appears to be a valid MP4, but the codec metadata is uncommon enough that a quick re-encode is the safest path for DaVinci Resolve Free.`,
+      recommendations: [
+        'Export as H.264 video and AAC audio in MP4 format.',
+        'Use a standard preset from your editor or a converter such as HandBrake.',
+        'Import a short test clip before committing a full project.'
       ]
     };
   }
 
   return {
     level: 'warning',
-    title: 'Possible compatibility issue',
-    summary: `The codec (${videoCodec}) is not a common DaVinci Resolve Free profile and may need a quick transcode test before editing.`,
+    title: 'Needs a manual check',
+    summary: 'The browser could read the file as MP4, but not enough codec information was exposed to give a confident verdict. A quick export to H.264/AAC MP4 is recommended.',
     recommendations: [
-      'Transcode to H.264 video and AAC audio in MP4 format.',
-      'Export a fresh MP4 from your source editor if possible.',
-      'Check compatibility with a small test clip before full project import.'
+      'Re-export to H.264 + AAC in MP4 format.',
+      'Try a short clip in DaVinci Resolve Free before editing a long project.',
+      'If the file still fails, convert it with a standard preset.'
     ]
   };
 }
@@ -177,9 +235,7 @@ function readVideoMetadata(file) {
 }
 
 function showExportPreset() {
-  const sourceName = selectedFile ? selectedFile.name : 'input.mp4';
-  const outputName = sourceName.replace(/\.mp4$/i, '-h264-aac.mp4');
-  const ffmpegCommand = `ffmpeg -i "${sourceName}" -c:v libx264 -preset medium -crf 20 -c:a aac -movflags +faststart "${outputName}"`;
+  const command = generateExportCommand(selectedFile);
 
   setStatus('Recommended export profile: H.264 + AAC in MP4', 'success');
   setBadge('warning', 'Best format');
@@ -189,11 +245,11 @@ function showExportPreset() {
     <li>Use AAC audio.</li>
     <li>Keep the MP4 container.</li>
     <li>Use a standard preset or the FFmpeg command below.</li>
-    <li><code>${ffmpegCommand}</code></li>
+    <li><code>${command}</code></li>
   `;
 
   if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(ffmpegCommand).catch(() => {});
+    navigator.clipboard.writeText(command).catch(() => {});
   }
 }
 
@@ -232,7 +288,7 @@ async function analyzeFile(file) {
 
     updateMetadata(file, resultInfo);
 
-    const result = evaluateCompatibility(resultInfo.videoCodec, resultInfo.audioCodec);
+    const result = evaluateCompatibility(resultInfo.videoCodec, resultInfo.audioCodec, resultInfo.width, resultInfo.height);
 
     setBadge(
       result.level === 'good' ? 'good' :

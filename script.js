@@ -4,6 +4,7 @@ const statusBox = document.getElementById('status');
 const compatibilityBadge = document.getElementById('compatibilityBadge');
 const compatibilitySummary = document.getElementById('compatibilitySummary');
 const recommendations = document.getElementById('recommendations');
+const exportPresetButton = document.getElementById('exportPresetButton');
 
 const fileNameEl = document.getElementById('fileName');
 const fileFormatEl = document.getElementById('fileFormat');
@@ -173,6 +174,25 @@ function readVideoMetadata(file) {
   });
 }
 
+function showExportPreset() {
+  const ffmpegCommand = 'ffmpeg -i input.mp4 -c:v libx264 -preset medium -crf 20 -c:a aac -movflags +faststart output.mp4';
+
+  setStatus('Recommended export profile: H.264 + AAC in MP4', 'success');
+  setBadge('warning', 'Best format');
+  compatibilitySummary.textContent = 'This is the safest export profile for DaVinci Resolve Free when a file is unreadable, unusual, or needs re-encoding.';
+  recommendations.innerHTML = `
+    <li>Use H.264 video.</li>
+    <li>Use AAC audio.</li>
+    <li>Keep the MP4 container.</li>
+    <li>Use a standard preset or the FFmpeg command below.</li>
+    <li><code>${ffmpegCommand}</code></li>
+  `;
+
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(ffmpegCommand).catch(() => {});
+  }
+}
+
 async function analyzeFile(file) {
   if (!file) return;
 
@@ -235,6 +255,8 @@ function handleFileSelection(fileList) {
   if (!fileList || !fileList.length) return;
   analyzeFile(fileList[0]);
 }
+
+exportPresetButton.addEventListener('click', showExportPreset);
 
 fileInput.addEventListener('change', (event) => {
   handleFileSelection(event.target.files);
